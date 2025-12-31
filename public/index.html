@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>New Year Live Countdown</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>New Year Live Countdown</h1>
+    <p class="subtitle">Live countdowns and celebrations around the world — responsive for desktop & mobile</p>
+  </header>
+
+  <main id="app">
+    <div id="controls">
+      <input id="filter" placeholder="Filter country or timezone" />
+      <div class="controls-row">
+        <select id="test-country"><option value="__auto">Auto (top)</option></select>
+        <button id="test-celebrate" class="primary">Test Celebration</button>
+        <button id="preview-all" class="primary">Preview All Effects</button>
+        <label class="onebyone-label"><input id="onebyone-toggle" type="checkbox"/> One-by-one</label>
+          <label class="lineup-label"><input id="lineup-toggle" type="checkbox"/> Lineup (first→last)</label>
+        <label class="sound-label"><input id="sound-toggle" type="checkbox" checked/> Sound</label>
+      </div>
+      <div class="controls-row">
+        <div id="sound-downloads" style="display:flex;gap:8px;align-items:center"></div>
+      </div>
+    </div>
+    <section id="grid" class="grid"></section>
+  </main>
+
+  <!-- Canvas overlay for realistic confetti/fireworks -->
+  <canvas id="celebrate-canvas" style="position:fixed;inset:0;pointer-events:none;z-index:1400"></canvas>
+
+  <!-- Video modal -->
+  <div id="video-modal" class="modal" aria-hidden="true">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <button id="modal-close" class="modal-close">✕</button>
+      <div class="modal-body">
+            <iframe id="video-iframe" width="100%" height="360" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen style="display:none"></iframe>
+            <div id="fallback-body" style="display:none">
+              <p id="fallback-text">No live video found.</p>
+              <div style="margin-top:12px">
+                <a id="fallback-open" class="actions-button" target="_blank" rel="noopener">Open YouTube search</a>
+              </div>
+            </div>
+          </div>
+    </div>
+  </div>
+
+  <!-- Country details modal -->
+  <div id="country-modal" class="modal" aria-hidden="true">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <button id="country-close" class="modal-close">✕</button>
+      <div id="country-body" class="modal-body">
+        <h2 id="country-title"></h2>
+        <div id="country-summary"></div>
+        <h3>Leader / Office</h3>
+        <div id="country-leader"></div>
+        <h3>Celebrations & Images</h3>
+        <div id="country-images" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+        <h3>Wishes</h3>
+        <ul id="country-wishes"></ul>
+        <div style="margin-top:12px">
+          <a id="country-news" target="_blank" rel="noopener">Open News Search</a>
+          &nbsp;|&nbsp;
+          <a id="country-youtube" target="_blank" rel="noopener">Open YouTube Live Search</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <small>Scaffolded — customize to fetch live streams or add more countries.</small>
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>
