@@ -55,66 +55,67 @@ app.get('/api/country/:code/details', async (req, res) => {
   if (!c) return res.status(404).json({ error: 'country not found' });
 
   const name = c.name;
-  const summary = { wikiSummary: null, wikiUrl: null };
-  const leader = { query: null, wikiSummary: null, wikiUrl: null };
-  const images = [];
 
-  try {
-    // Wikipedia REST summary for country
-    const wikiResp = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(name)}`);
-    if (wikiResp.ok) {
-      const wj = await wikiResp.json();
-      summary.wikiSummary = wj.extract || null;
-      summary.wikiUrl = wj.content_urls && wj.content_urls.desktop && wj.content_urls.desktop.page || `https://en.wikipedia.org/wiki/${encodeURIComponent(name)}`;
-    }
-
-    // Try to fetch leader (President/Prime Minister) by searching common titles
-    const leaderTitles = [`President of ${name}`, `Prime Minister of ${name}`, `Monarch of ${name}`];
-    for (const q of leaderTitles) {
-      const s = await fetch(`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(q)}&format=json&utf8=1`);
-      if (!s.ok) continue;
-      const sj = await s.json();
-      if (sj.query && sj.query.search && sj.query.search.length) {
-        const pageTitle = sj.query.search[0].title;
-        leader.query = pageTitle;
-        const p = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(pageTitle)}`);
-        if (p.ok) {
-          const pj = await p.json();
-          leader.wikiSummary = pj.extract || null;
-          leader.wikiUrl = pj.content_urls && pj.content_urls.desktop && pj.content_urls.desktop.page || `https://en.wikipedia.org/wiki/${encodeURIComponent(pageTitle)}`;
-        }
-        break;
-      }
-    }
-
-    // Wikimedia search for images related to New Year {country}
-    const imgQ = `New Year ${name}`;
-    const imgUrl = `https://en.wikipedia.org/w/api.php?action=query&format=json&generator=search&gsrsearch=${encodeURIComponent(imgQ)}&gsrlimit=8&prop=pageimages&piprop=original&origin=*`;
-    const ir = await fetch(imgUrl);
-    if (ir.ok) {
-      const ij = await ir.json();
-      if (ij.query && ij.query.pages) {
-        Object.values(ij.query.pages).forEach(p => {
-          if (p.original && p.original.source) images.push(p.original.source);
-        });
-      }
-    }
-  } catch (err) {
-    console.warn('country details fetch error', err.message);
-  }
-
-  // Compose search links for news and YouTube as fallbacks
+  // Fast local payload so the client can show a details modal reliably.
+  const localSummary = { wikiSummary: `Details for ${name}`, wikiUrl: `https://en.wikipedia.org/wiki/${encodeURIComponent(name)}` };
+  const localLeader = { query: null, wikiSummary: null, wikiUrl: null };
+  const localImages = [];
   const newsSearch = `https://www.google.com/search?q=${encodeURIComponent('New Year ' + name + ' news')}`;
   const youtubeSearch = `https://www.youtube.com/results?search_query=${encodeURIComponent('New Year live ' + name)}`;
-
-  // Generate simple wishes (could be replaced by TTS or DB)
   const wishes = [
     `Happy New Year to the people of ${name}!`,
     `Wishing prosperity and peace to ${name} in the coming year.`,
     `Warm New Year wishes to the leaders and citizens of ${name}.`
   ];
 
-  res.json({ code, name, timezone: c.timezone, summary, leader, images, newsSearch, youtubeSearch, wishes });
+  // If the client explicitly requests enrichment, attempt external fetches
+  // but fall back to local data on any network failure.
+  if (req.query.enrich === '1') {
+    try {
+      if (fetch) {
+        const wikiResp = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(name)}`);
+        if (wikiResp && wikiResp.ok) {
+          const wj = await wikiResp.json();
+          localSummary.wikiSummary = wj.extract || localSummary.wikiSummary;
+          localSummary.wikiUrl = (wj.content_urls && wj.content_urls.desktop && wj.content_urls.desktop.page) || localSummary.wikiUrl;
+        }
+
+        const leaderTitles = [`President of ${name}`, `Prime Minister of ${name}`, `Monarch of ${name}`];
+        for (const q of leaderTitles) {
+          const s = await fetch(`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(q)}&format=json&utf8=1`);
+          if (!s || !s.ok) continue;
+          const sj = await s.json();
+          if (sj.query && sj.query.search && sj.query.search.length) {
+            const pageTitle = sj.query.search[0].title;
+            localLeader.query = pageTitle;
+            const p = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(pageTitle)}`);
+            if (p && p.ok) {
+              const pj = await p.json();
+              localLeader.wikiSummary = pj.extract || null;
+              localLeader.wikiUrl = (pj.content_urls && pj.content_urls.desktop && pj.content_urls.desktop.page) || `https://en.wikipedia.org/wiki/${encodeURIComponent(pageTitle)}`;
+            }
+            break;
+          }
+        }
+
+        const imgQ = `New Year ${name}`;
+        const imgUrl = `https://en.wikipedia.org/w/api.php?action=query&format=json&generator=search&gsrsearch=${encodeURIComponent(imgQ)}&gsrlimit=8&prop=pageimages&piprop=original&origin=*`;
+        const ir = await fetch(imgUrl);
+        if (ir && ir.ok) {
+          const ij = await ir.json();
+          if (ij.query && ij.query.pages) {
+            Object.values(ij.query.pages).forEach(p => {
+              if (p.original && p.original.source) localImages.push(p.original.source);
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('country details enrichment failed', err && err.message);
+    }
+  }
+
+  res.json({ code, name, timezone: c.timezone, summary: localSummary, leader: localLeader, images: localImages, newsSearch, youtubeSearch, wishes });
 });
 
 app.get('/events', (req, res) => {
