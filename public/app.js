@@ -458,25 +458,29 @@ async function init() {
 
   // (virtualization renders visible items via renderWindow)
 
-  const evt = new EventSource('/events');
-    evt.onmessage = e => {
-      const payload = JSON.parse(e.data);
-      // Update client-side countries ordering to match server-sent earliest->latest order
+  // Polling-based events (serverless-friendly). Fetch /api/events every second.
+  let _evtTimer = null;
+  async function pollEvents() {
+    try {
+      const r = await fetch('/api/events');
+      if (!r.ok) return;
+      const payload = await r.json();
       if (payload && payload.countries && payload.countries.length) {
-        // keep full payload data so rendering can access `localISO` and `remaining`
         countries = payload.countries.map(c => ({ code: c.code, name: c.name, timezone: c.timezone, localISO: c.localISO, remaining: c.remaining, celebrating: c.celebrating }));
       }
-      // re-render virtual window first so newly ordered DOM items are created
       const viewportEl = document.getElementById('viewport');
       if (viewportEl) {
         viewportEl.dispatchEvent(new Event('scroll'));
-        // if lineup mode enabled, ensure the next upcoming country (first in list) is at top
         const lineupToggle = document.getElementById('lineup-toggle');
         if (lineupToggle && lineupToggle.checked) scrollToIndex(0);
       }
-      // then update visible card times/status from the payload
       updateCards(payload);
-    };
+    } catch (err) {
+      // ignore polling errors silently
+    }
+  }
+  pollEvents();
+  _evtTimer = setInterval(pollEvents, 1000);
 
   viewportEl.addEventListener('click', (ev) => {
     const btn = ev.target.closest('.live-btn');
@@ -502,7 +506,7 @@ async function init() {
       if (!code) return;
       (async () => {
         try {
-          const r = await fetch(`/api/country/${encodeURIComponent(code)}/details`);
+          const r = await fetch(`/api/country/${encodeURIComponent(code)}/details?enrich=1`);
           if (!r.ok) throw new Error('failed');
           const data = await r.json();
           openCountryModal(data);
