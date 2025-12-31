@@ -2,7 +2,15 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const fetch = require('node-fetch');
+// Prefer the built-in global `fetch` (Node 18+). If unavailable, dynamically import `node-fetch`.
+let fetch = globalThis.fetch;
+if (!fetch) {
+  try {
+    fetch = (...args) => import('node-fetch').then(m => m.default(...args));
+  } catch (e) {
+    console.warn('node-fetch import failed, fetch unavailable', e && e.message);
+  }
+}
 const { DateTime } = require('luxon');
 let cat = null;
 try {
